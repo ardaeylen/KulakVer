@@ -17,6 +17,9 @@ from PIL import GifImagePlugin
 import cv2
 #from tensorflow.python.keras.engine import keras_tensor
 from ActivityDetectionAlgorithm import Detection
+from tkinter import messagebox as tmb
+import multiprocessing
+
 
 
 #google_key="112417540618206329954"
@@ -25,15 +28,19 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 customtkinter.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
 customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
 
-event = threading.Event()
+recording_event = threading.Event()
+activity_Detection_event = threading.Event()
+
+
+
 class App(customtkinter.CTk):
     
     def __init__(self):
         
         super().__init__()
-
+        self.protocol('WM_DELETE_WINDOW', self.close_app)
         # configure window
-        self.title("CustomTkinter complex_example.py")
+        self.title("Kulak Ver")
         self.geometry(f"{1100}x{580}")
 
         # configure grid layout (4x4)
@@ -96,6 +103,10 @@ class App(customtkinter.CTk):
         self.picture_label3.grid(row=3, column=3,padx=20, pady=(10, 10))
         self.main_frame_label3 = customtkinter.CTkLabel(self.main_frame,text="")
         self.main_frame_label3.grid(row=4, column=0, padx=20, pady=(10, 0))
+
+
+
+        
         self.main_frame_button = customtkinter.CTkButton(self.main_frame, text="Dinle",command=button_callback)
         self.main_frame_button.grid(row=5, column=2)
         self.cam_button= customtkinter.CTkButton(self.main_frame,text="Kamera",command=kamera_callback)
@@ -216,10 +227,22 @@ class App(customtkinter.CTk):
         new_scaling_float = int(new_scaling.replace("%", "")) / 100
         customtkinter.set_widget_scaling(new_scaling_float)
     '''
+
     def sidebar_button_event(self):
         print("sidebar_button click")
     def change_appearance_mode_event(self, new_appearance_mode: str): 
         customtkinter.set_appearance_mode(new_appearance_mode)
+
+    def close_app(self):
+        if tmb.askokcancel("Close", "Are you sure...?"):
+            self.destroy()
+            #process = multiprocessing.current_process()
+            #process.kill()
+            #activity_Detection_event.clear()
+            #recording_event.clear()
+            #t2.join()
+            #t1.join()
+            os._exit(os.EX_OK)
 
 def init_file(FORMATIN, audio):
     wf = wave.open("/home/berk/Desktop/test.wav", "wb")
@@ -370,7 +393,7 @@ def record():
 
     wf = init_file(FORMATIN, audio)
     data = b''
-    while event.is_set():
+    while recording_event.is_set():
         data = streamIn.read(CHUNK)
         wf.writeframes(data)
 
@@ -400,19 +423,26 @@ def close_recording(audio, streamIn, wf):
 #--------------------kamera----------------
 
 def button_callback():
-    if not event.is_set():
-        event.set()
+    if not recording_event.is_set():
+        recording_event.set()
         #main_frame_button._text="Durdur"
-        t1 = threading.Thread(target=record, args=()).start()
+        t1 = threading.Thread(target=record, args=())
+
+        t1.start()
     else:
-        event.clear()
+        recording_event.clear()
+        
 
 def kamera_callback():
-    if not event.is_set():
-        event.set
-        t2 = threading.Thread(target=Detection.DetectActivities,args=()).start()
+    if not activity_Detection_event.is_set():
+        activity_Detection_event.set()
+        Detection.detection_event.set()
+        t2 = threading.Thread(target=Detection.DetectActivities,args=())
+        t2.start()
     else:
-        event.clear()
+        activity_Detection_event.clear()
+        Detection.detection_event.clear()
+        
 
     
 if __name__ == "__main__":

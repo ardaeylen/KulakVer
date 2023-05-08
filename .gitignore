@@ -3,3 +3,4 @@ ActivityDetectionAlgorithm/yolov4-bitirme_last.weights
 *.txt
 sample*
 *.cfg
+animations

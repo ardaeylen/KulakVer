@@ -5,10 +5,16 @@ import time
 import pyscreenshot as ImageGrab
 import pyvirtualcam
 import os
+import sys
+from threading import Event
+
+detection_event = Event()
 _class = "wave"
 image = ImageGrab.grab()
 image = np.array(image.convert("RGB"))
-    
+
+
+ 
 labels = ['wave', 'okey', 'think', 'thumb_down', 'thumb_up', 'sleepy', 'clap', 'head_scratching', 'laugh']
 CONFIDENCE_THRESHOLD = 0.2  # Confidence Threshold
 NMS_THRESHOLD = 0.8  # Non-Max Suppression Threshold
@@ -31,7 +37,7 @@ idx_to_labels = {
 
 def camera_thread_function():
 
-    while True:
+    while detection_event.is_set():
         global image
 
         image = ImageGrab.grab(childprocess=False)
@@ -39,7 +45,7 @@ def camera_thread_function():
         # ----------------
 def detection_function(model, net, output_label_dictionary, CONFIDENCE_THRESHOLD, NMS_THRESHOLD):
 
-    while (True):
+    while (detection_event.is_set()):
         global image
 
         try:
@@ -74,25 +80,34 @@ def detection_function(model, net, output_label_dictionary, CONFIDENCE_THRESHOLD
 
 # Concurrency test-----------------------
 def DetectActivities():
-    global image
-    net = cv2.dnn.readNet(network_conf_file, network_weights)
-    net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-    net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA_FP16)
+        os.popen("sudo -S %s"%("sudo modprobe -r v4l2loopback && sudo modprobe v4l2loopback devices=1 video_nr=4 card_label=\"Virtual\" exclusive_caps=1 max_buffers=2"), 'w').write('1')
+    
+        global image
+        net = cv2.dnn.readNet(network_conf_file, network_weights)
+        net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+        net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA_FP16)
 
-    model = cv2.dnn.DetectionModel(net)
+        model = cv2.dnn.DetectionModel(net)
 
-    model.setInputParams(size=(640,640), scale=1 / 255.0, swapRB=True)
+        model.setInputParams(size=(640,640), scale=1 / 255.0, swapRB=True)
 
-    #camera_thread_function(model=model)
+        #camera_thread_function(model=model)
 
-    camera_thread = Thread(target=camera_thread_function, args=())
-    detection_thread = Thread(target=detection_function, args=(model, net, idx_to_labels
-                                                                ,CONFIDENCE_THRESHOLD,
-                                                                NMS_THRESHOLD))
-    init_cam_thread = Thread(target = init_cam, args = ())
-    camera_thread.start()
-    detection_thread.start()
-    init_cam_thread.start()
+        camera_thread = Thread(target=camera_thread_function, args=())
+        detection_thread = Thread(target=detection_function, args=(model, net, idx_to_labels
+                                                                    ,CONFIDENCE_THRESHOLD,
+                                                                    NMS_THRESHOLD))
+        init_cam_thread = Thread(target = init_cam, args = ())
+        init_cam_thread.start()
+        camera_thread.start()
+        detection_thread.start()
+        
+        camera_thread.join()
+        detection_thread.join()
+        init_cam_thread.join()
+        print("Camera Thread finished")
+        os.popen("sudo -S %s"%("sudo rm -r /dev/video4"), 'w').write('1')
+        sys.exit()
 
 def stream_animation(virtualCam, frames):
 	for i in range(0, len(frames)):
@@ -125,29 +140,29 @@ def extract_frames(videoPath, camera_width, camera_height):
 
 
 def display_avatars(da_width, da_height, da_fps):
+    
     with pyvirtualcam.Camera(width=da_width,height=da_height, fps=da_fps, device='/dev/video4') as cam:
         global _class
-        default_animation_frames = extract_frames("sample", cam.width, cam.height)
+        default_animation_frames = extract_frames('/home/berk/Desktop/KulakVer/KulakVer/animations/kadinOkey.mp4', cam.width, cam.height)
         laugh_frames = extract_frames("sample2", cam.width, cam.height)
         print(f'Using virtual camera: {cam.device}')
         frame = np.zeros((cam.height, cam.width, 3), np.uint8)  # RGB
         i=0
-        while True:
+        while detection_event.is_set():
             # Take input from action recognition
             # parse input
-            if (i%100 == 0):
-                if _class == "wave":
-                    stream_animation(cam, default_animation_frames)
+           
+            if _class == "wave":
+                stream_animation(cam, default_animation_frames)
+                print(_class)
+            if _class == "thumb_up":
+                stream_animation(cam, laugh_frames)
                     
-                else:
-                    stream_animation(cam, laugh_frames)
-                    
-                
-            default_animation(cam, frame)
-            
-            i=i+1
+            else:
+                default_animation(cam, frame)
+
 
 def init_cam():
-    os.popen("sudo -S %s"%("sudo modprobe -r v4l2loopback && sudo modprobe v4l2loopback devices=1 video_nr=4 card_label=\"Virtual\" exclusive_caps=1 max_buffers=2"), 'w').write('1')
+    #os.popen("sudo -S %s"%("sudo modprobe -r v4l2loopback && sudo modprobe v4l2loopback devices=1 video_nr=4 card_label=\"Virtual\" exclusive_caps=1 max_buffers=2"), 'w').write('1')
     #os.system("sudo modprobe -r v4l2loopback && sudo modprobe v4l2loopback devices=1 video_nr=4 card_label=\"Virtual\" exclusive_caps=1 max_buffers=2")
-    display_avatars(1200, 700, 10)
+    display_avatars(1200, 700, 5)
