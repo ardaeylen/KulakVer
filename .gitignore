@@ -1,0 +1,6 @@
+ActivityDetectionAlgorithm/yolov4-bitirme_last.weights
+*.png
+*.txt
+sample1*
+sample2*
+*.cfg
